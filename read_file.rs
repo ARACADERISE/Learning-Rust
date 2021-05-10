@@ -13,7 +13,7 @@ enum IoErro
     InvalidFormat(String)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Vals {
     path: PathBuf,
     file_info: Vec<String>,
@@ -50,6 +50,29 @@ impl IoErro
             Err(t) => panic!{t}
         }
     }
+
+    fn panic_if_invalid_char(val: u8) -> Result<char, String>
+    {
+        match val {
+            _ if val < 0x41 || val > 0x7A => return Err(format!("{} is invalid", val as char)),
+            _ => {}
+        }
+        Ok(val as char)
+    }
+
+    fn check_each_index(arr: Vec<String>) -> Result<Option<Vec<String>>, String>
+    {
+        for i in 0..arr.len() {
+            for x in arr[i].chars() {
+                match IoErro::panic_if_invalid_char(x as u8) {
+                    Ok(_) => {},
+                    Err(t) => return Err(t)
+                }
+            }
+        }
+
+        Ok(Some(arr))
+    }
 } 
 
 impl Vals {
@@ -67,7 +90,10 @@ impl Vals {
 
         let content = BufReader::new(File::open(&info.path)?);
         for line in content.lines() {
-            info.file_info.push(line?);
+            match line {
+                Ok(t) => info.file_info.push(t),
+                Err(t) => panic!{"Err: {}", t}
+            }
         }
 
         let mut vec: Vec<String> = Vec::new();
@@ -95,12 +121,24 @@ impl Vals {
 
         Ok(info)
     }
+
+    fn _loop(&self)
+    {
+        for i in 0..self.file_info.len()
+        {
+            println!("{}", self.file_info[i]);
+        }
+    }
 }
 
 fn main()
 {
     //IoErro::panic_if_format_error("?");
 
-    let val = Vals::new(&PathBuf::from(".due"));
-    println!("{:?}", val);
+    let val = Vals::new(&PathBuf::from(".due")).unwrap();
+    match IoErro::check_each_index(val.file_info) {
+        Ok(Some(t)) => println!("{:?}", t),
+        Err(t) => println!("{}", t),
+        _ => {} // shoud never get here
+    }
 }
