@@ -2,20 +2,20 @@
 use std::path::PathBuf;
 use std::fs::File;
 use std::io;
-use std::io::{BufReader, BufRead};
+use std::io::{BufReader, BufRead, Error, ErrorKind};
 
 #[derive(Debug)]
 enum IoErrors {
     IOError(io::Error),
+    NoSuchFile,
     EmptyFile,
     InvalidChar
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct Info {
     path: PathBuf,
-    valid_file: Result<PathBuf, String>,
+    valid_file: Result<PathBuf, IoErrors>,
     file_info: Option<Vec<String>>
 }
 
@@ -26,35 +26,41 @@ impl From<io::Error> for IoErrors {
 }
 
 impl IoErrors {
+    fn io_err(err: Error) -> IoErrors {
+        return IoErrors::IOError(err);
+    } 
     fn empty_file() -> IoErrors {
         return IoErrors::EmptyFile;
     }
     fn invalid_char() -> IoErrors {
         return IoErrors::InvalidChar;
     }
+    fn no_such_file() -> IoErrors {
+        return IoErrors::NoSuchFile;
+    }
 }
 
 trait Functions {
     fn new() -> Self; // return empty struct
-    fn assign(&mut self, dir: PathBuf, file: String) -> &Self;
+    fn assign(&mut self, dir: PathBuf, file: String) -> Result<&Self, IoErrors>;
 }
 
 impl Functions for Info {
     fn new() -> Self {
         Self {path: PathBuf::from("."), valid_file: Ok(PathBuf::from(".")), file_info: None }
     }
-    fn assign(&mut self, dir: PathBuf, file: String) -> &Self {
+    fn assign(&mut self, dir: PathBuf, file: String) -> Result<&Self, IoErrors> {
         self.path = dir.join(file);
         
         if !self.path.exists() {
-            self.valid_file = Err(format!("The file {:?} does not exist", self.path));
+            self.valid_file = Err(IoErrors::no_such_file());
             self.file_info = None;
-            return self
+            return Err(IoErrors::io_err(Error::new(ErrorKind::NotFound, "File Not Found")));
         }
         
         self.valid_file = Ok(self.path.to_path_buf());
         self.file_info = None;
-        return self;
+        return Ok(self);
     }
 }
 
@@ -132,5 +138,13 @@ impl Info {
 
 fn main() {
     let mut info = Info::new();
-    info.assign(PathBuf::from("."), "main.rs".to_string());
+    match info.assign(PathBuf::from("."), "main.rss".to_string()) {
+        Err(ref t) => println!("{:?}", t),
+        _ => {}
+    }
+
+    match info.valid_file {
+        Ok(_) => {},
+        Err(t) => panic!("{:?}", t)
+    }
 }
